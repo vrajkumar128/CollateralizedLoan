@@ -39,7 +39,6 @@ contract CollateralizedLoan {
                 existingLoan.collateralAmount == loanToCheck.collateralAmount && 
                 existingLoan.loanAmount == loanToCheck.loanAmount && 
                 existingLoan.interestRate == loanToCheck.interestRate &&
-                existingLoan.dueDate == loanToCheck.dueDate &&
                 existingLoan.isFunded == loanToCheck.isFunded &&
                 existingLoan.isRepaid == loanToCheck.isRepaid &&
                 existingLoan.isDefaulted == loanToCheck.isDefaulted) {
