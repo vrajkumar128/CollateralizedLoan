@@ -8,7 +8,7 @@ To run locally:
   <li>Run <code>git clone https://github.com/vrajkumar128/CollateralizedLoan.git</code>.</li>
   <li><code>cd</code> into the cloned directory and run <code>npm install</code>.</li>
   <li>Spin up a local Hardhat node using <code>npx hardhat node</code>.</li>
-  <li>From another terminal, deploy the contract locally with <code>npx hardhat run scripts/deploy.js --network localhost</code>. This will output the contract address that the smart contract was deployed to.</li>
+  <li>From another terminal, deploy the contract locally with <code>npx hardhat run scripts/deploy.js --network localhost</code>. This will output the contract address that the smart contract was deployed to, beginning with <code>0x</code>.</li>
   <li>From <i>another</i> terminal, run <code>npx hardhat console --network localhost</code>.</li>
   <li>Now, you can interact with the contract. Try the following:</li>
 </ol>
