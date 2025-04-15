@@ -20,7 +20,7 @@ const accounts = await ethers.getSigners();
 // Request a loan
 await contract.connect(accounts[1]).depositCollateralAndRequestLoan(1, 60, { value: 3 });
 
-// Fund a loan
+// Fund the requested loan from a different account
 await contract.connect(accounts[2]).fundLoan(0, { value: 3 });</code></pre>
 
 To test the smart contract's functionality, you can run `npx hardhat test` from inside the cloned directory.
