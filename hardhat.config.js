@@ -18,6 +18,11 @@ const config = {
       accounts: [process.env.ACCOUNT_PRIVATE_KEY].filter(Boolean),
     },
   },
+  mocha: {
+    spec: [
+      './test/CollateralizedLoan.js'
+    ]
+  }
 };
 
 module.exports = config;
