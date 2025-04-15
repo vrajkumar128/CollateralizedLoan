@@ -117,7 +117,7 @@ contract CollateralizedLoan {
         require(_loanId < nextLoanId, "Loan does not exist");
         Loan storage loan = loans[_loanId];
         require(msg.sender == loan.borrower, "Only the borrower can repay this loan");
-        require(loan.isFunded, "Loan has not yet funded");
+        require(loan.isFunded, "Loan has not yet been funded");
         require(block.timestamp <= loan.dueDate, "Loan has expired and cannot be repaid");
         require(!loan.isRepaid, "Loan has already been repaid");
     
@@ -144,9 +144,9 @@ contract CollateralizedLoan {
     function claimCollateral(uint _loanId) external {
         require(_loanId < nextLoanId, "Loan does not exist");
         Loan storage loan = loans[_loanId];
-        require(msg.sender == loan.lender, "Only the lender can claim collateral");
-        require(loan.isFunded, "Loan is not yet funded");
-        require(!loan.isRepaid, "Loan is already repaid");
+        require(msg.sender == loan.lender, "Only the lender can claim the collateral of this loan");
+        require(loan.isFunded, "Loan has not yet been funded");
+        require(!loan.isRepaid, "Loan was repaid on time");
         require(block.timestamp > loan.dueDate, "Loan is not yet past due date");
 
         // Mark loan as closed

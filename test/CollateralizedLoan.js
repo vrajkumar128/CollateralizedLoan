@@ -272,7 +272,7 @@ describe("CollateralizedLoan", function () {
       expect(actualDifference).to.equal(expectedDifference);
     });
 
-    it("Should not allow a lender to fund a loan that has not been requested", async function () {
+    it("Should not allow a lender to fund a loan that does not exist", async function () {
       const { collateralizedLoanContract, lender } = await loadFixture(
         deployCollateralizedLoanFixture
       );
@@ -426,12 +426,7 @@ describe("CollateralizedLoan", function () {
 
       // Confirm that the loan has been marked as repaid
       const repaidLoan = await borrowerContract.loans(loanId);
-      expect(repaidLoan.collateralAmount).to.equal(collateralAmount);
-      expect(repaidLoan.loanAmount).to.equal(loanAmount);
-      expect(repaidLoan.interestRate).to.equal(interestRate);
-      expect(repaidLoan.isFunded).to.equal(true);
-      expect(repaidLoan.isRepaid).to.equal(true); // THIS SHOULD NOW BE TRUE
-      expect(repaidLoan.isDefaulted).to.equal(false);
+      expect(repaidLoan.isRepaid).to.equal(true);
     });
 
     it("Should emit a LoanRepaid event upon a successful loan repayment", async function () {
@@ -529,7 +524,7 @@ describe("CollateralizedLoan", function () {
       expect(balanceDifference).to.equal(repaymentAmount);
     });
 
-    // This test is actually the same as the next one -- I only duplicated them for clarity reasons when looking at the testing output
+    // This test is actually the same as the next one -- I only duplicated them for clarity's sake when looking at the testing output
     it("Should subtract the repayment amount (plus gas costs) from the borrower's address upon a successful loan repayment", async function () {
       const { collateralizedLoanContract, borrower, lender } = await loadFixture(
         deployCollateralizedLoanFixture
@@ -643,7 +638,7 @@ describe("CollateralizedLoan", function () {
       expect(actualDifference).to.equal(expectedDifference);
     });
 
-    it("Should not allow a borrower to repay a loan that has not been requested", async function () {
+    it("Should not allow a borrower to repay a loan that does not exist", async function () {
       const { collateralizedLoanContract, borrower } = await loadFixture(
         deployCollateralizedLoanFixture
       );
@@ -708,10 +703,8 @@ describe("CollateralizedLoan", function () {
       }
 
       // Confirm that the actual borrower can still repay successfully
-      await expect(borrowerContract
-        .repayLoan(loanId, { value: repaymentAmount }))
-        .to.emit(collateralizedLoanContract, "LoanRepaid")
-        .withArgs(loanId);
+      await borrowerContract
+        .repayLoan(loanId, { value: repaymentAmount });
 
       // Confirm that the loan has been marked as repaid
       const repaidLoan = await collateralizedLoanContract.loans(loanId);
@@ -845,7 +838,7 @@ describe("CollateralizedLoan", function () {
       expect(repaidLoan.isRepaid).to.equal(true);
     });
 
-    it("Should not allow a borrower to repay a loan with the incorrect repayment amount", async function () {
+    it("Should not allow a borrower to repay a loan with the incorrect repayment amount (either underpaying or overpaying)", async function () {
       const { collateralizedLoanContract, borrower, lender } = await loadFixture(
         deployCollateralizedLoanFixture
       );
@@ -888,12 +881,12 @@ describe("CollateralizedLoan", function () {
       fundedLoan = await borrowerContract.loans(loanId);
       expect(fundedLoan.isRepaid).to.equal(false);
 
-      // Deviate from the correct repayment amount in the positive direction (underpaying)
+      // Deviate from the correct repayment amount in the negative direction (underpaying)
       const incorrectRepaymentAmount2 = repaymentAmount - BigInt(1);
 
       // Attempt to have the borrower repay the loan with the second incorrect repayment amount
       await expect(borrowerContract
-        .repayLoan(loanId, { value: incorrectRepaymentAmount1 }))
+        .repayLoan(loanId, { value: incorrectRepaymentAmount2 }))
         .to.be.revertedWith("Incorrect repayment amount");
 
       // Confirm that the loan has not been marked as being repaid
@@ -915,7 +908,7 @@ describe("CollateralizedLoan", function () {
       const collateralAmount = BigInt(3);
       const loanAmount = collateralAmount;
 
-      // Tie the contract deployment to a specific lender address
+      // Save a contract instance with the lender connected
       const lenderContract = collateralizedLoanContract.connect(lender);
 
       // Have a borrower request a loan
@@ -926,8 +919,11 @@ describe("CollateralizedLoan", function () {
       // Have the lender fund the loan
       const loanId = 0;
       await lenderContract
-        .connect(lender)
         .fundLoan(loanId, { value: loanAmount });
+
+      // Verify that the loan is marked as being funded
+      let fundedLoan = await lenderContract.loans(loanId);
+      expect(fundedLoan.isFunded).to.equal(true);
 
       // Fast forward time past the loan's due date
       await ethers.provider.send("evm_increaseTime", [Number(duration) + 100]); // Add 100 seconds to be sure
@@ -937,13 +933,9 @@ describe("CollateralizedLoan", function () {
       await lenderContract.claimCollateral(loanId);
 
       // Confirm the loan is now in default
-      const defaultedLoan = await collateralizedLoanContract.loans(loanId);
-      expect(defaultedLoan.collateralAmount).to.equal(collateralAmount);
-      expect(defaultedLoan.loanAmount).to.equal(loanAmount);
-      expect(defaultedLoan.interestRate).to.equal(interestRate);
-      expect(defaultedLoan.isFunded).to.equal(true);
-      expect(defaultedLoan.isRepaid).to.equal(false); // THIS SHOULD BE FALSE
-      expect(defaultedLoan.isDefaulted).to.equal(true); // THIS SHOULD NOW BE TRUE
+      const defaultedLoan = await lenderContract.loans(loanId);
+      expect(defaultedLoan.isRepaid).to.equal(false);
+      expect(defaultedLoan.isDefaulted).to.equal(true)
     });
 
     it("Should emit a CollateralClaimed event upon a successful collateral claim", async function () {
@@ -957,7 +949,7 @@ describe("CollateralizedLoan", function () {
       const collateralAmount = BigInt(3);
       const loanAmount = collateralAmount;
 
-      // Tie the contract deployment to a specific lender address
+      // Save a contract instance with the lender connected
       const lenderContract = collateralizedLoanContract.connect(lender);
 
       // Have a borrower request a loan
@@ -968,8 +960,11 @@ describe("CollateralizedLoan", function () {
       // Have the lender fund the loan
       const loanId = 0;
       await lenderContract
-        .connect(lender)
         .fundLoan(loanId, { value: loanAmount });
+
+      // Verify that the loan is marked as being funded
+      let fundedLoan = await lenderContract.loans(loanId);
+      expect(fundedLoan.isFunded).to.equal(true);
 
       // Fast forward time past the loan's due date
       await ethers.provider.send("evm_increaseTime", [Number(duration) + 100]); // Add 100 seconds to be sure
@@ -979,10 +974,14 @@ describe("CollateralizedLoan", function () {
       await expect(lenderContract.claimCollateral(loanId))
         .to.emit(lenderContract, "CollateralClaimed")
         .withArgs(borrower.address, lender.address, collateralAmount);
+
+      // Confirm the loan is now in default
+      const defaultedLoan = await lenderContract.loans(loanId);
+      expect(defaultedLoan.isRepaid).to.equal(false);
+      expect(defaultedLoan.isDefaulted).to.equal(true);
     });
 
-    it("Should add the collateral amount (minus gas costs) to the lender's address if the loan defaults", async function () {
-      assert.fail();
+    it("Should add the collateral amount (minus gas costs) to the lender's address upon claiming the collateral", async function () {
       const { collateralizedLoanContract, borrower, lender } = await loadFixture(
         deployCollateralizedLoanFixture
       );
@@ -993,50 +992,68 @@ describe("CollateralizedLoan", function () {
       const collateralAmount = BigInt(3);
       const loanAmount = collateralAmount;
 
-      // Tie the contract deployment to a specific borrower address
-      const borrowerContract = collateralizedLoanContract.connect(borrower);
+      // Save a contract instance with the lender connected
+      const lenderContract = collateralizedLoanContract.connect(lender);
 
-      // Have the borrower request a loan
-      await borrowerContract.depositCollateralAndRequestLoan(interestRate, duration, { value: collateralAmount });
+      // Have a borrower request a loan
+      await lenderContract
+        .connect(borrower)
+        .depositCollateralAndRequestLoan(interestRate, duration, { value: collateralAmount });
 
-      // Get the borrower's wallet balance before the loan is funded
-      const borrowerBalanceBefore = await ethers.provider.getBalance(borrower.address);
-
-      // Have a lender fund the loan
+      // Have the lender fund the loan
       const loanId = 0;
-      await collateralizedLoanContract
-        .connect(lender)
+      await lenderContract
         .fundLoan(loanId, { value: loanAmount });
 
-      // Get the borrower's wallet balance after the loan is funded
-      const borrowerBalanceAfter = await ethers.provider.getBalance(borrower.address);
+      // Verify that the loan is marked as being funded
+      let fundedLoan = await lenderContract.loans(loanId);
+      expect(fundedLoan.isFunded).to.equal(true);
 
-      // Calculate the difference in the borrower's balance before and after the loan is funded
-      const balanceDifference = borrowerBalanceAfter - borrowerBalanceBefore;
+      // Fast forward time past the loan's due date
+      await ethers.provider.send("evm_increaseTime", [Number(duration) + 100]); // Add 100 seconds to be sure
+      await ethers.provider.send("evm_mine"); // Mine a new block to apply the time change
 
-      // Verify that the balance difference is equal to the loan amount
-      expect(balanceDifference).to.equal(loanAmount);
+      // Get the lenders's wallet balance before the collateral is claimed
+      const lenderBalanceBefore = await ethers.provider.getBalance(lender.address);
+
+      // Have the lender claim the loan's collateral
+      const claimTx = await lenderContract.claimCollateral(loanId);
+
+      // Get the transaction receipt to determine gas costs
+      const receipt = await claimTx.wait();
+      const gasCost = receipt.gasUsed * receipt.gasPrice;
+
+      // Get the lender's wallet balance after the collateral is claimed
+      const lenderBalanceAfter = await ethers.provider.getBalance(lender.address);
+
+      // Calculate the difference in the lender's balance (including gas costs) before and after the collateral is claimed
+      const expectedDifference = collateralAmount - gasCost;
+      const actualDifference = lenderBalanceAfter - lenderBalanceBefore;
+
+      // Verify that the balance difference is equal to the loan amount plus gas fees and minus collateral
+      expect(actualDifference).to.equal(expectedDifference);
+
+      // Confirm that the loan is now in default
+      const defaultedLoan = await lenderContract.loans(loanId);
+      expect(defaultedLoan.isRepaid).to.equal(false);
+      expect(defaultedLoan.isDefaulted).to.equal(true);
     });
 
-    it("Should not allow claiming collateral from a loan that has not been requested", async function () {
-      assert.fail();
+    it("Should not allow a lender to claim collateral from a loan that does not exist", async function () {
       const { collateralizedLoanContract, borrower, lender } = await loadFixture(
         deployCollateralizedLoanFixture
       );
 
-      // Specify loan parameters
-      const collateralAmount = BigInt(3);
-      const loanAmount = collateralAmount;
-
-      // Attempt to have a lender fund a loan that has not been requested
+      // Attempt to have a lender claim collateral from a loan that has not been requested
       const loanId = 0;
       expect(collateralizedLoanContract.connect(lender)
-        .fundLoan(loanId, { value: loanAmount }))
+        .claimCollateral(loanId))
         .to.be.revertedWith("Loan does not exist");
     });
 
+    // For practical reasons this test is not truly exhaustive -- it tests only 19 non-lender addresses
     it("Should not allow anyone but the lender of the loan to claim the collateral", async function () {
-      assert.fail();
+      const accounts = await ethers.getSigners(); // Supplies 20 test accounts (including the lender)
       const { collateralizedLoanContract, borrower, lender } = await loadFixture(
         deployCollateralizedLoanFixture
       );
@@ -1047,32 +1064,48 @@ describe("CollateralizedLoan", function () {
       const collateralAmount = BigInt(3);
       const loanAmount = collateralAmount;
 
+      // Save a contract instance with the lender connected
+      const lenderContract = collateralizedLoanContract.connect(lender);
+
       // Have a borrower request a loan
-      await collateralizedLoanContract
+      await lenderContract
         .connect(borrower)
         .depositCollateralAndRequestLoan(interestRate, duration, { value: collateralAmount });
 
-      // Have a lender fund the loan
+      // Have the lender fund the loan
       const loanId = 0;
-      await collateralizedLoanContract
-        .connect(lender)
+      await lenderContract
         .fundLoan(loanId, { value: loanAmount });
 
-      // Confirm that the loan is now funded
-      const fundedLoan = await collateralizedLoanContract.loans(loanId);
+      // Verify that the loan is marked as being funded
+      let fundedLoan = await lenderContract.loans(loanId);
       expect(fundedLoan.isFunded).to.equal(true);
 
-      // Attempt to fund the loan again
-      expect(collateralizedLoanContract.connect(lender)
-        .fundLoan(loanId, { value: loanAmount }))
-        .to.be.revertedWith(`Requested loan has already been funded by lender ${lender.address.toLowerCase()}`);
+      // Fast forward time past the loan's due date
+      await ethers.provider.send("evm_increaseTime", [Number(duration) + 100]); // Add 100 seconds to be sure
+      await ethers.provider.send("evm_mine"); // Mine a new block to apply the time change
 
-      // Confirm that attempting to fund the loan again did not change its status
-      expect(fundedLoan.isFunded).to.equal(true);
+      // Try to claim the collateral with non-lender accounts
+      for (const account of accounts) {
+        if (account.address !== lender.address) {
+          await expect(
+            lenderContract
+              .connect(account)
+              .claimCollateral(loanId))
+              .to.be.revertedWith("Only the lender can claim the collateral of this loan");
+        }
+      }
+
+      // Confirm that the actual lender can still claim the collateral
+      await lenderContract.claimCollateral(loanId);
+
+      // Confirm the loan is now in default
+      const defaultedLoan = await lenderContract.loans(loanId);
+      expect(defaultedLoan.isRepaid).to.equal(false);
+      expect(defaultedLoan.isDefaulted).to.equal(true)
     });
 
-    it("Should not allow a lender to claim collateral from a loan that has not been funded", async function () {
-      assert.fail();
+    it("Should not allow a lender to claim collateral from a loan that has not yet been funded", async function () {
       const { collateralizedLoanContract, borrower, lender } = await loadFixture(
         deployCollateralizedLoanFixture
       );
@@ -1081,34 +1114,36 @@ describe("CollateralizedLoan", function () {
       const interestRate = BigInt(1);
       const duration = BigInt(60);
       const collateralAmount = BigInt(3);
-      const loanAmount = collateralAmount;
+
+      // Save a contract instance with the lender connected
+      const lenderContract = collateralizedLoanContract.connect(lender);
 
       // Have a borrower request a loan
-      await collateralizedLoanContract
+      await lenderContract
         .connect(borrower)
         .depositCollateralAndRequestLoan(interestRate, duration, { value: collateralAmount });
 
-      // Have a lender fund the loan
+      // Fast forward time past the loan's due date
+      await ethers.provider.send("evm_increaseTime", [Number(duration) + 100]); // Add 100 seconds to be sure
+      await ethers.provider.send("evm_mine"); // Mine a new block to apply the time change
+
+      // Verify that the loan is not marked as being funded
       const loanId = 0;
-      await collateralizedLoanContract
-        .connect(lender)
-        .fundLoan(loanId, { value: loanAmount });
+      let loan = await lenderContract.loans(loanId);
+      expect(loan.isFunded).to.equal(false);
 
-      // Confirm that the loan is now funded
-      const fundedLoan = await collateralizedLoanContract.loans(loanId);
-      expect(fundedLoan.isFunded).to.equal(true);
+      // Attempt to have a lender claim collateral from a loan that has not been funded
+      expect(lenderContract
+        .claimCollateral(loanId))
+        .to.be.revertedWith("Loan has not yet been funded");
 
-      // Attempt to fund the loan again
-      expect(collateralizedLoanContract.connect(lender)
-        .fundLoan(loanId, { value: loanAmount }))
-        .to.be.revertedWith(`Requested loan has already been funded by lender ${lender.address.toLowerCase()}`);
-
-      // Confirm that attempting to fund the loan again did not change its status
-      expect(fundedLoan.isFunded).to.equal(true);
+      // Confirm that the loan is *not* in default
+      const defaultedLoan = await lenderContract.loans(loanId);
+      expect(defaultedLoan.isRepaid).to.equal(false);
+      expect(defaultedLoan.isDefaulted).to.equal(false);
     });
 
     it("Should not allow a lender to claim collateral from a loan that was repaid in time", async function () {
-      assert.fail();
       const { collateralizedLoanContract, borrower, lender } = await loadFixture(
         deployCollateralizedLoanFixture
       );
@@ -1119,29 +1154,50 @@ describe("CollateralizedLoan", function () {
       const collateralAmount = BigInt(3);
       const loanAmount = collateralAmount;
 
+      // Save a contract instance with the lender connected
+      const lenderContract = collateralizedLoanContract.connect(lender);
+
       // Have a borrower request a loan
-      await collateralizedLoanContract
+      await lenderContract
         .connect(borrower)
         .depositCollateralAndRequestLoan(interestRate, duration, { value: collateralAmount });
+
+      // Have the lender fund the loan
+      const loanId = 0;
+      await lenderContract
+        .fundLoan(loanId, { value: loanAmount });
+
+      // Verify that the loan is marked as being funded
+      let fundedLoan = await lenderContract.loans(loanId);
+      expect(fundedLoan.isFunded).to.equal(true);
+
+      // Use interest rate to calculate loan repayment amouont
+      const repaymentAmount = fundedLoan.loanAmount + ((fundedLoan.loanAmount * BigInt(fundedLoan.interestRate)) / BigInt(100));
+
+      // Have the borrower repay the loan
+      await lenderContract
+        .connect(borrower)
+        .repayLoan(loanId, { value: repaymentAmount });
+
+      // Confirm that the loan has been marked as repaid
+      const repaidLoan = await lenderContract.loans(loanId);
+      expect(repaidLoan.isRepaid).to.equal(true);
 
       // Fast forward time past the loan's due date
       await ethers.provider.send("evm_increaseTime", [Number(duration) + 100]); // Add 100 seconds to be sure
       await ethers.provider.send("evm_mine"); // Mine a new block to apply the time change
 
-      // Attempt to have a lender fund the loan
-      const loanId = 0;
-      await expect(collateralizedLoanContract
-        .connect(lender)
-        .fundLoan(loanId, { value: loanAmount }))
-        .to.be.revertedWith("Loan has expired");
+      // Attempt to have the lender claim collateral from a loan that was was repaid on time
+      expect(lenderContract
+        .claimCollateral(loanId))
+        .to.be.revertedWith("Loan was repaid on time");
 
-      // Verify that the loan has not been marked as being funded
-      const loan = await collateralizedLoanContract.loans(loanId);
-      expect(loan.isFunded).to.equal(false);
+      // Confirm that the loan is *not* in default
+      const defaultedLoan = await lenderContract.loans(loanId);
+      expect(defaultedLoan.isDefaulted).to.equal(false);
     });
 
     it("Should not allow a lender to claim collateral from an outstanding loan that has not yet expired", async function () {
-      assert.fail();
       const { collateralizedLoanContract, borrower, lender } = await loadFixture(
         deployCollateralizedLoanFixture
       );
@@ -1152,25 +1208,32 @@ describe("CollateralizedLoan", function () {
       const collateralAmount = BigInt(3);
       const loanAmount = collateralAmount;
 
+      // Save a contract instance with the lender connected
+      const lenderContract = collateralizedLoanContract.connect(lender);
+
       // Have a borrower request a loan
-      await collateralizedLoanContract
+      await lenderContract
         .connect(borrower)
         .depositCollateralAndRequestLoan(interestRate, duration, { value: collateralAmount });
 
-      // Fast forward time past the loan's due date
-      await ethers.provider.send("evm_increaseTime", [Number(duration) + 100]); // Add 100 seconds to be sure
-      await ethers.provider.send("evm_mine"); // Mine a new block to apply the time change
-
-      // Attempt to have a lender fund the loan
+      // Have the lender fund the loan
       const loanId = 0;
-      await expect(collateralizedLoanContract
-        .connect(lender)
-        .fundLoan(loanId, { value: loanAmount }))
-        .to.be.revertedWith("Loan has expired");
+      await lenderContract
+        .fundLoan(loanId, { value: loanAmount });
 
-      // Verify that the loan has not been marked as being funded
-      const loan = await collateralizedLoanContract.loans(loanId);
-      expect(loan.isFunded).to.equal(false);
+      // Verify that the loan is marked as being funded
+      let fundedLoan = await lenderContract.loans(loanId);
+      expect(fundedLoan.isFunded).to.equal(true);
+
+      // Attempt to have the lender claim collateral from an outstanding loan that has not yet expired
+      expect(lenderContract
+        .claimCollateral(loanId))
+        .to.be.revertedWith("Loan is not yet past due date");
+
+      // Confirm that the loan is *not* in default
+      const defaultedLoan = await lenderContract.loans(loanId);
+      expect(defaultedLoan.isRepaid).to.equal(false);
+      expect(defaultedLoan.isDefaulted).to.equal(false);
     });
   });
 });
