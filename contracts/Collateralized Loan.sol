@@ -117,9 +117,9 @@ contract CollateralizedLoan {
         require(_loanId < nextLoanId, "Loan does not exist");
         Loan storage loan = loans[_loanId];
         require(msg.sender == loan.borrower, "Only the borrower can repay this loan");
-        require(loan.isFunded, "Loan is not yet funded");
+        require(loan.isFunded, "Loan has not yet funded");
         require(block.timestamp <= loan.dueDate, "Loan has expired and cannot be repaid");
-        require(!loan.isRepaid, "Loan is already repaid");
+        require(!loan.isRepaid, "Loan has already been repaid");
     
         // Calculate repayment amount (principal + interest)
         uint repaymentAmount = loan.loanAmount + ((loan.loanAmount * loan.interestRate) / 100);
