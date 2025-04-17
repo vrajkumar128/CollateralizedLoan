@@ -2,20 +2,20 @@ const { loadFixture } = require("@nomicfoundation/hardhat-toolbox/network-helper
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
 
+// Use a fixture to reduce code repetition
+async function deployCollateralizedLoanFixture() {
+
+  // Create and deploy a fresh CollateralizedLoan contract
+  const CollateralizedLoan = await ethers.getContractFactory("CollateralizedLoan");
+  const collateralizedLoanContract = await CollateralizedLoan.deploy();
+
+  // Create contract owner and consumers
+  const [owner, borrower, lender] = await ethers.getSigners();
+
+  return { collateralizedLoanContract, owner, borrower, lender };
+}
+
 function runClaimCollateralTests() {
-
-  // Use a fixture to reduce code repetition
-  async function deployCollateralizedLoanFixture() {
-
-    // Create and deploy a fresh CollateralizedLoan contract
-    const CollateralizedLoan = await ethers.getContractFactory("CollateralizedLoan");
-    const collateralizedLoanContract = await CollateralizedLoan.deploy();
-
-    // Create contract owner and consumers
-    const [owner, borrower, lender] = await ethers.getSigners();
-
-    return { collateralizedLoanContract, owner, borrower, lender };
-  }
 
   // Test suite for claiming collateral
   describe("Claiming Collateral", function () {
@@ -406,5 +406,8 @@ function runClaimCollateralTests() {
   });
 }
 
-// Export the tests
+// Run the tests from just this file
+runClaimCollateralTests();
+
+// Export the tests for testing in the main test script
 module.exports = runClaimCollateralTests;
