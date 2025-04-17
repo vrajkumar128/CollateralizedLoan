@@ -357,6 +357,52 @@ function runClaimCollateralTests() {
       expect(defaultedLoan.isRepaid).to.equal(false);
       expect(defaultedLoan.isDefaulted).to.equal(false);
     });
+
+    it("Should not allow a lender to claim collateral from a loan that the collateral has already been claimed from", async function () {
+      const { collateralizedLoanContract, borrower, lender } = await loadFixture(
+        deployCollateralizedLoanFixture
+      );
+
+      // Specify loan parameters
+      const interestRate = BigInt(1);
+      const duration = BigInt(60);
+      const collateralAmount = BigInt(3);
+      const loanAmount = collateralAmount;
+
+      // Save a contract instance with the lender connected
+      const lenderContract = collateralizedLoanContract.connect(lender);
+
+      // Have a borrower request a loan
+      await lenderContract
+        .connect(borrower)
+        .depositCollateralAndRequestLoan(interestRate, duration, { value: collateralAmount });
+
+      // Have the lender fund the loan
+      const loanId = 0;
+      await lenderContract
+        .fundLoan(loanId, { value: loanAmount });
+
+      // Verify that the loan is marked as being funded
+      let fundedLoan = await lenderContract.loans(loanId);
+      expect(fundedLoan.isFunded).to.equal(true);
+
+      // Fast forward time past the loan's due date
+      await ethers.provider.send("evm_increaseTime", [Number(duration) + 100]); // Add 100 seconds to be sure
+      await ethers.provider.send("evm_mine"); // Mine a new block to apply the time change
+
+      // Have the lender claim the loan's collateral
+      lenderContract.claimCollateral(loanId);
+
+      // Confirm that the loan is now in default
+      const defaultedLoan = await lenderContract.loans(loanId);
+      expect(defaultedLoan.isRepaid).to.equal(false);
+      expect(defaultedLoan.isDefaulted).to.equal(false);
+
+      // Attempt to have the lender claim the loan's collateral again
+      expect(lenderContract
+        .claimCollateral(loanId))
+        .to.be.revertedWith("Collateral has already been claimed");
+    });
   });
 }
 

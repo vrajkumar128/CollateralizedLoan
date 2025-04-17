@@ -148,6 +148,7 @@ contract CollateralizedLoan {
         require(loan.isFunded, "Loan has not yet been funded");
         require(!loan.isRepaid, "Loan was repaid on time");
         require(block.timestamp > loan.dueDate, "Loan is not yet past due date");
+        require(!loan.isDefaulted, "Collateral has already been claimed");
 
         // Mark loan as closed
         loan.isDefaulted = true;
